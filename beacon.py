@@ -141,8 +141,8 @@ def getWorstWeather():
     today_code = int(yahoo_result['forecasts'][0]['code'])
     tomorrow_code = int(yahoo_result['forecasts'][1]['code'])
     now_indicator = yahoo_codes[now_code]['indicator']
-    today_indicator = yahoo_codes[now_code]['indicator']
-    tomorrow_indicator = yahoo_codes[now_code]['indicator']
+    today_indicator = yahoo_codes[today_code]['indicator']
+    tomorrow_indicator = yahoo_codes[tomorrow_code]['indicator']
     
     worst = now_indicator
     worst_code = now_code
