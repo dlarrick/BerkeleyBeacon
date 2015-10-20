@@ -17,7 +17,7 @@ offMinute = 30
 
 
 colors = [46920, 0] # blue, red
-colors_xy = [[0.139,0.081], [0.7,0.2986]]
+colors_xy = [[0.1911,0.0866], [0.7,0.2986]]
 
 # indicators: 0: blue (clear); 1: flashing blue (clouds); 2: red (rain); 3: flashing red (snow/severe)
 yahoo_codes = [
@@ -138,8 +138,9 @@ def Off():
 def getWorstWeather():
     yahoo_result = pywapi.get_weather_from_yahoo(zipcode)
     tomorrow_code = int(yahoo_result['forecasts'][1]['code'])
+    # now and today are ['condition']['code'] and ['forecasts'][0]['code'] respectively
     tomorrow_indicator = yahoo_codes[tomorrow_code]['indicator']
-    
+        
     worst = tomorrow_indicator
     worst_code = tomorrow_code
     worst_day = 'tomorrow'
