@@ -137,24 +137,12 @@ def Off():
 
 def getWorstWeather():
     yahoo_result = pywapi.get_weather_from_yahoo(zipcode)
-    now_code = int(yahoo_result['condition']['code'])
-    today_code = int(yahoo_result['forecasts'][0]['code'])
     tomorrow_code = int(yahoo_result['forecasts'][1]['code'])
-    now_indicator = yahoo_codes[now_code]['indicator']
-    today_indicator = yahoo_codes[today_code]['indicator']
     tomorrow_indicator = yahoo_codes[tomorrow_code]['indicator']
     
-    worst = now_indicator
-    worst_code = now_code
-    worst_day = 'now'
-    if (worst < today_indicator):
-        worst = today_indicator
-        worst_code = today_code
-        worst_day = 'today'
-    if (worst < tomorrow_indicator):
-        worst = tomorrow_indicator
-        worst_code = tomorrow_code
-        worst_day = 'tomorrow'
+    worst = tomorrow_indicator
+    worst_code = tomorrow_code
+    worst_day = 'tomorrow'
     print ("Worst weather is " + yahoo_codes[worst_code]['description'] + " " + worst_day)
     return worst
 
