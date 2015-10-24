@@ -117,21 +117,15 @@ class ColorSequencer(IntervalTimer):
             OnColor(colorIndex)
         else:
             Off()
-        #print ""
         self._counter += 1
         if (self._counter >= len(self._sequence)):
             self._counter = 0
 
 def OnColor(colorIndex):
-    print ("On, color " +  str(colors_xy[colorIndex]))
-    sys.stdout.flush()
-    #resource = { 'which':beacon, 'data': { 'state': {'on':True, 'hue':colors[colorIndex], 'sat':255, 'bri':255}}}
     resource = { 'which':beacon, 'data': { 'state': {'on':True, 'xy':colors_xy[colorIndex], 'sat':255, 'bri':255}}}
     bridge.light.update(resource)
 
 def Off():
-    print "Off"
-    sys.stdout.flush()
     resource = { 'which':beacon, 'data': { 'state': {'on':False}}}
     bridge.light.update(resource)
 
@@ -204,14 +198,20 @@ def main():
 
                 if (worstWeather == 0):
                     OnColor(0)
+                    print 'On, steady blue'
                 elif (worstWeather == 1):
                     runningSequencer = blueSequencer
-                    blueSequencer.start()
+                    runningSequencer.start()
+                    blueSequencer = ColorSequencer(sleep, blueSequence)
+                    print 'On, flashing blue'
                 elif (worstWeather == 2):
                     OnColor(1)
+                    print 'On, steady red'
                 elif (worstWeather == 3):
                     runningSequencer = redSequencer
-                    redSequencer.start()
+                    runningSequencer.start()
+                    redSequencer = ColorSequencer(sleep, redSequence)
+                    print 'On, flashing red'
                 running = True
 
             if (running and not shouldRun):
@@ -220,6 +220,7 @@ def main():
                 if (runningSequencer):
                     runningSequencer.stop()
                 Off()
+                print 'Off'
                 running = False
 
             sys.stdout.flush()
