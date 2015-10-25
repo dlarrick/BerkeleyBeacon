@@ -74,10 +74,21 @@ def main():
     blueSequence = [1, -1]
     redSequencer = ColorSequencer(sleep, redSequence)
     blueSequencer = ColorSequencer(sleep, blueSequence)
-    redSequencer.start()
+    runningSequencer = None
+    runningSequencer = redSequencer
+    redSequencer = ColorSequencer(sleep, redSequence)
+    runningSequencer.start()
     time.sleep(10)
-    redSequencer.stop()
-    blueSequencer.start();
+    runningSequencer.stop()
+    runningSequencer = blueSequencer
+    blueSequencer = ColorSequencer(sleep, blueSequence)
+    runningSequencer.start();
     time.sleep(10)
-    blueSequencer.stop()
+    runningSequencer.stop()
+    runningSequencer = redSequencer
+    redSequencer = ColorSequencer(sleep, redSequence)
+    runningSequencer.start()
+    time.sleep(10)
+    runningSequencer.stop()
+
 main()

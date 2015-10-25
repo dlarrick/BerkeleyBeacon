@@ -12,7 +12,7 @@ beacon = 2
 sleepduration = 2.5
 zipcode = '02465'
 sunsetCity = 'Boston'
-runTimes = [['sunset','23:00'], ['6:00','sunrise']]
+runTimes = [['sunset','sunrise'], ['sunrise','sunset']]
 
 
 colors = [46920, 0] # blue, red
@@ -121,12 +121,14 @@ class ColorSequencer(IntervalTimer):
             self._counter = 0
 
 def OnColor(colorIndex):
-    resource = { 'which':beacon, 'data': { 'state': {'on':True, 'xy':colors_xy[colorIndex], 'sat':255, 'bri':255}}}
-    bridge.light.update(resource)
+    print ('On, color ' + str(colorIndex))
+    #resource = { 'which':beacon, 'data': { 'state': {'on':True, 'xy':colors_xy[colorIndex], 'sat':255, 'bri':255}}}
+    #bridge.light.update(resource)
 
 def Off():
-    resource = { 'which':beacon, 'data': { 'state': {'on':False}}}
-    bridge.light.update(resource)
+    print 'Off'
+    #resource = { 'which':beacon, 'data': { 'state': {'on':False}}}
+    #bridge.light.update(resource)
 
 def getWorstWeather():
     yahoo_result = pywapi.get_weather_from_yahoo(zipcode)
@@ -134,8 +136,9 @@ def getWorstWeather():
     tomorrow_code = int(yahoo_result['forecasts'][1]['code'])
     # now and today are ['condition']['code'] and ['forecasts'][0]['code'] respectively
     # Before noon, use today's weather; after noon, use tomorrow's
+    # For testing, use seconds
     now = datetime.datetime.now()
-    if (now.hour < 12):
+    if (now.second < 30):
         worst_code = today_code
         worst_day = 'today'
     else:
@@ -204,8 +207,8 @@ def main():
             
             if (running and shouldRun):
                 print 'Running'
-                # Re-check weather once an hour
-                if ((now - weatherTime).total_seconds() > 60*60):
+                # Re-check weather once a minute
+                if ((now - weatherTime).total_seconds() > 15):
                     currentWeather = worstWeather
                     worstWeather = getWorstWeather()
                     weatherTime = now
@@ -269,7 +272,7 @@ def main():
                 running = False
 
             sys.stdout.flush()
-            time.sleep(60)
+            time.sleep(5)
 
     except KeyboardInterrupt:
         print 'Bye!'
