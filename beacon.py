@@ -16,7 +16,7 @@ runTimes = [['sunset','23:00'], ['6:00','sunrise']]
 
 
 colors = [46920, 0] # blue, red
-colors_xy = [[0.1911,0.0866], [0.7,0.2986]]
+colors_xy = [[0.2182,0.1485], [0.7,0.2986]]
 
 # indicators: 0: blue (clear); 1: flashing blue (clouds); 2: red (rain); 3: flashing red (snow/severe)
 yahoo_codes = [
