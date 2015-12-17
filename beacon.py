@@ -13,6 +13,7 @@ sleepduration = 2.5
 zipcode = '02465'
 sunsetCity = 'Boston'
 runTimes = [['sunset','23:00'], ['6:00','sunrise']]
+#runTimes = [['sunset','23:00'], ['6:00','8:00']]
 
 
 colors = [46920, 0] # blue, red
@@ -130,9 +131,16 @@ def Off():
 
 def getWorstWeather():
     yahoo_result = pywapi.get_weather_from_yahoo(zipcode)
-    today_code = int(yahoo_result['forecasts'][0]['code'])
-    tomorrow_code = int(yahoo_result['forecasts'][1]['code'])
+    today = datetime.date.today()
+    date0str = yahoo_result['forecasts'][0]['date']
+    date0 = datetime.datetime.strptime(date0str, '%d %b %Y').date()
+    today_offset = 0
+    if date0 != today:
+        today_offset = 1
+    today_code = int(yahoo_result['forecasts'][today_offset]['code'])
+    tomorrow_code = int(yahoo_result['forecasts'][today_offset+1]['code'])
     # now and today are ['condition']['code'] and ['forecasts'][0]['code'] respectively
+    # Sometimes it has yesterday's forecasts still, so check that [0] is really today
     # Before noon, use today's weather; after noon, use tomorrow's
     now = datetime.datetime.now()
     if (now.hour < 12):

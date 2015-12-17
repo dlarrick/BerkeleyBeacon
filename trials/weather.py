@@ -1,4 +1,5 @@
 import pywapi
+import datetime
 
 #city = "West Newton, MA"
  
@@ -75,11 +76,27 @@ yahoo_codes = [
     {'code': 46, 'description': 'snow showers', 'indicator': 3},
     {'code': 47, 'description': 'isolated thundershowers', 'indicator': 1}
 ]
-yahoo_result = pywapi.get_weather_from_yahoo("02465")
+#woeid = "12758853"
+woeid = "02465"
+yahoo_result = pywapi.get_weather_from_yahoo(woeid)
+
+#print yahoo_result
+
+today = datetime.date.today()
+
+
+datestr = yahoo_result['forecasts'][0]['date']
+date0 = datetime.datetime.strptime(datestr, '%d %b %Y').date()
+print "Today is " + str(today) + ", date0 is " + str(date0)
+
+today_offset = 0
+if date0 != today:
+    today_offset = 1
 
 now_code = int(yahoo_result['condition']['code'])
-today_code = int(yahoo_result['forecasts'][0]['code'])
-tomorrow_code = int(yahoo_result['forecasts'][1]['code'])
+today_code = int(yahoo_result['forecasts'][today_offset]['code'])
+tomorrow_code = int(yahoo_result['forecasts'][today_offset+1]['code'])
+
 
 print ("Now: code " + str(now_code) + "(" + str(yahoo_codes[now_code]['code']) + " " + yahoo_codes[now_code]['description'] + ") is indicator " + str(yahoo_codes[now_code]['indicator']))
 
