@@ -215,7 +215,11 @@ def main():
                 # Re-check weather once an hour
                 if ((now - weatherTime).total_seconds() > 60*60):
                     currentWeather = worstWeather
-                    worstWeather = getWorstWeather()
+                    try:
+                        worstWeather = getWorstWeather()
+                    except:
+                        print('Failed to update weather')
+                        worstWeather = currentWeather
                     weatherTime = now
                     if (worstWeather != currentWeather):
                         print 'Weather changed'
@@ -246,7 +250,12 @@ def main():
             if (shouldRun and not running):
                 # Get weather and start running
                 print 'Not running but should be - start'
-                worstWeather = getWorstWeather()
+                try:
+                    worstWeather = getWorstWeather()
+                except:
+                    worstWeather = 0
+                    print("Failed to get weather; assume clear")
+                
                 weatherTime = now
 
                 if (worstWeather == 0):
