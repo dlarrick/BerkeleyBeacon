@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Notify script for 'nut' UPS monitor to turn Hue bulbs off at the end
+# of a power outage, since they default to on when power is restored.
+
 # Wait a bit and turn Philips Hue bulbs back off
 case $NOTIFYTYPE in
     ONLINE)
