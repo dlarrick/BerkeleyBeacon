@@ -1,10 +1,12 @@
 import sys
 import time
 import datetime
+import pytz
 from astral import *
 from beautifulhue.api import Bridge
 from threading import Thread, Event
-import pywapi
+import pyowm
+import owmkey
 
 username = '1cd503803c2588ef8ea97d02a2520df'
 bridge = Bridge(device={'ip':'192.168.1.24'}, user={'name':username})
@@ -12,64 +14,54 @@ beacon = 2
 sleepduration = 2.5
 zipcode = '02465'
 sunsetCity = 'Boston'
+timezone = 'America/New_York'
+owmCityId = 4945283
+
+# Note: provide 'owmkey.py' file that contains a function get_owm_key
+# returning your own OpenWeatherMap key
+OWM_KEY = owmkey.get_owm_key()
+
 runTimes = [['sunset','23:00'], ['6:00','sunrise']]
-#runTimes = [['sunset','23:00'], ['6:00','8:00']]
+#debug:
+#runTimes = [['sunset','23:00'], ['6:00','23:00']]
 
+colors_xy = [[0.2182,0.1485], [0.7,0.2986]] # blue, red
 
-colors = [46920, 0] # blue, red
-colors_xy = [[0.2182,0.1485], [0.7,0.2986]]
+local_tz = pytz.timezone(timezone)
+
+def utc_to_local(utc_dt):
+    local_dt = utc_dt.replace(tzinfo=pytz.utc).astimezone(local_tz)
+    return local_tz.normalize(local_dt) # .normalize might be unnecessary
 
 # indicators: 0: blue (clear); 1: flashing blue (clouds); 2: red (rain); 3: flashing red (snow/severe)
-yahoo_codes = [
-    {'code': 0, 'description': 'tornado', 'indicator': 3},
-    {'code': 1, 'description': 'tropical storm', 'indicator': 2},
-    {'code': 2, 'description': 'hurricane', 'indicator': 3},
-    {'code': 3, 'description': 'severe thunderstorms', 'indicator': 2},
-    {'code': 4, 'description': 'thunderstorms', 'indicator': 2},
-    {'code': 5, 'description': 'mixed rain and snow', 'indicator': 3},
-    {'code': 6, 'description': 'mixed rain and sleet', 'indicator': 3},
-    {'code': 7, 'description': 'mixed snow and sleet', 'indicator': 3},
-    {'code': 8, 'description': 'freezing drizzle', 'indicator': 3},
-    {'code': 9, 'description': 'drizzle', 'indicator': 2},
-    {'code': 10, 'description': 'freezing rain', 'indicator': 3},
-    {'code': 11, 'description': 'showers', 'indicator': 2},
-    {'code': 12, 'description': 'showers', 'indicator': 2},
-    {'code': 13, 'description': 'snow flurries', 'indicator': 3},
-    {'code': 14, 'description': 'light snow showers', 'indicator': 3},
-    {'code': 15, 'description': 'blowing snow', 'indicator': 3},
-    {'code': 16, 'description': 'snow', 'indicator': 3},
-    {'code': 17, 'description': 'hail', 'indicator': 3},
-    {'code': 18, 'description': 'sleet', 'indicator': 3},
-    {'code': 19, 'description': 'dust', 'indicator': 1},
-    {'code': 20, 'description': 'foggy', 'indicator': 1},
-    {'code': 21, 'description': 'haze', 'indicator': 1},
-    {'code': 22, 'description': 'smoky', 'indicator': 0},
-    {'code': 23, 'description': 'blustery', 'indicator': 0},
-    {'code': 24, 'description': 'windy', 'indicator': 0},
-    {'code': 25, 'description': 'cold', 'indicator': 0},
-    {'code': 26, 'description': 'cloudy', 'indicator': 1},
-    {'code': 27, 'description': 'mostly cloudy (night)', 'indicator': 1},
-    {'code': 28, 'description': 'mostly cloudy (day)', 'indicator': 1},
-    {'code': 29, 'description': 'partly cloudy (night)', 'indicator': 0},
-    {'code': 30, 'description': 'partly cloudy (day)', 'indicator': 0},
-    {'code': 31, 'description': 'clear (night)', 'indicator': 0},
-    {'code': 32, 'description': 'sunny', 'indicator': 0},
-    {'code': 33, 'description': 'fair (night)', 'indicator': 0},
-    {'code': 34, 'description': 'fair (day)', 'indicator': 0},
-    {'code': 35, 'description': 'mixed rain and hail', 'indicator': 2},
-    {'code': 36, 'description': 'hot', 'indicator': 0},
-    {'code': 37, 'description': 'isolated thunderstorms', 'indicator': 1},
-    {'code': 38, 'description': 'scattered thunderstorms', 'indicator': 2},
-    {'code': 39, 'description': 'scattered thunderstorms', 'indicator': 2},
-    {'code': 40, 'description': 'scattered showers', 'indicator': 2},
-    {'code': 41, 'description': 'heavy snow', 'indicator': 3},
-    {'code': 42, 'description': 'scattered snow showers', 'indicator': 3},
-    {'code': 43, 'description': 'heavy snow', 'indicator': 3},
-    {'code': 44, 'description': 'partly cloudy', 'indicator': 0},
-    {'code': 45, 'description': 'thundershowers', 'indicator': 1},
-    {'code': 46, 'description': 'snow showers', 'indicator': 3},
-    {'code': 47, 'description': 'isolated thundershowers', 'indicator': 1}
-]
+def owm_indicator(owm_code):
+    # Snow
+    if (owm_code >= 600 and owm_code < 622):
+        return 3
+    # Freezing rain
+    if (owm_code == 511):
+        return 3
+    # Severe
+    if (owm_code == 504 or
+        owm_code == 503 or
+        owm_code == 961 or
+        owm_code == 962 or
+        owm_code == 781 or
+        (owm_code >= 900 and
+         owm_code <= 906)):
+        return 3
+    # Rain
+    if ((owm_code >= 200 and
+         owm_code <= 232) or
+        (owm_code >= 500 and
+         owm_code <= 531)):
+        return 2
+    # Cloudy
+    # 801 (few clouds)
+    if ((owm_code >= 802 and
+         owm_code <= 804)):
+        return 1
+    return 0
 
 
 def getSystemData():
@@ -130,29 +122,36 @@ def Off():
     bridge.light.update(resource)
 
 def getWorstWeather():
-    yahoo_result = pywapi.get_weather_from_yahoo(zipcode)
-    today = datetime.date.today()
-    date0str = yahoo_result['forecasts'][0]['date']
-    date0 = datetime.datetime.strptime(date0str, '%d %b %Y').date()
-    today_offset = 0
-    if date0 != today:
-        today_offset = 1
-    today_code = int(yahoo_result['forecasts'][today_offset]['code'])
-    tomorrow_code = int(yahoo_result['forecasts'][today_offset+1]['code'])
-    # now and today are ['condition']['code'] and ['forecasts'][0]['code'] respectively
-    # Sometimes it has yesterday's forecasts still, so check that [0] is really today
-    # Before noon, use today's weather; after noon, use tomorrow's
-    now = datetime.datetime.now()
-    if (now.hour < 12):
-        worst_code = today_code
-        worst_day = 'today'
+    usingToday = False
+    if (datetime.datetime.now().hour < 12):
+        usingToday = True
+
+    if (usingToday):
+        comparedate = datetime.datetime.now().date()
     else:
-        worst_code = tomorrow_code
-        worst_day = 'tomorrow'
-    indicator = yahoo_codes[worst_code]['indicator']
-    print ("Worst weather is " + yahoo_codes[worst_code]['description'] + " " +
-           worst_day)
-    return indicator
+        comparedate = datetime.date.today() + datetime.timedelta(days=1)
+
+    owm = pyowm.OWM(OWM_KEY)
+    forecaster = owm.three_hours_forecast_at_id(owmCityId)
+    forecast = forecaster.get_forecast()
+    
+    worst_indicator = 0
+    found = False
+    worst_weather = 0
+    for weather in forecast:
+        weatherdatetime = utc_to_local(datetime.datetime.fromtimestamp(weather.get_reference_time('unix')))
+        if (weatherdatetime.date() == comparedate):
+            weather_code = weather.get_weather_code()
+            beacon_indicator = owm_indicator(weather_code)
+            if (beacon_indicator > worst_indicator or
+                found == False):
+                worst_indicator = beacon_indicator
+                worst_weather = weather
+                found = True
+            #print (weather.get_reference_time('iso'),weather.get_detailed_status(),weather_code,beacon_indicator)
+
+    print ("Worst indicator is " + str(worst_indicator) + " " + worst_weather.get_detailed_status())
+    return worst_indicator
 
 def main():
     response = getSystemData()
