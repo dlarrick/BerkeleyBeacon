@@ -131,6 +131,9 @@ def getWorstWeather():
     else:
         comparedate = datetime.date.today() + datetime.timedelta(days=1)
 
+    startdatetime = datetime.datetime.combine(comparedate, datetime.time(6,00,00,0,local_tz))
+    stopdatetime = datetime.datetime.combine(comparedate, datetime.time(18,00,00,0,local_tz))
+    
     owm = pyowm.OWM(OWM_KEY)
     forecaster = owm.three_hours_forecast_at_id(owmCityId)
     forecast = forecaster.get_forecast()
@@ -140,7 +143,7 @@ def getWorstWeather():
     worst_weather = 0
     for weather in forecast:
         weatherdatetime = utc_to_local(datetime.datetime.fromtimestamp(weather.get_reference_time('unix')))
-        if (weatherdatetime.date() == comparedate):
+        if (weatherdatetime >= startdatetime and weatherdatetime <= stopdatetime):
             weather_code = weather.get_weather_code()
             beacon_indicator = owm_indicator(weather_code)
             if (beacon_indicator > worst_indicator or

@@ -105,12 +105,15 @@ else:
     print "using Tomorrow:"
     comparedate = datetime.date.today() + datetime.timedelta(days=1)
 
+startdatetime = datetime.datetime.combine(comparedate, datetime.time(6,00,00,0,local_tz))
+stopdatetime = datetime.datetime.combine(comparedate, datetime.time(18,00,00,0,local_tz))
+
 worst_indicator = 0
 found = False
 worst_weather = 0
 for weather in forecast:
     weatherdatetime = utc_to_local(datetime.datetime.fromtimestamp(weather.get_reference_time('unix')))
-    if (weatherdatetime.date() == comparedate):
+    if (weatherdatetime >= startdatetime and weatherdatetime <= stopdatetime):
         weather_code = weather.get_weather_code()
         beacon_indicator = owm_indicator(weather_code)
         if (beacon_indicator > worst_indicator or
