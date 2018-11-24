@@ -1,16 +1,18 @@
 import sys
 import time
 import datetime
-import pytz
-from astral import *
-from beautifulhue.api import Bridge
 from threading import Thread, Event
+import pytz
+import astral
+from beautifulhue.api import Bridge
 import pyowm
 import owmkey
 
 username = '1cd503803c2588ef8ea97d02a2520df'
 bridge = Bridge(device={'ip':'192.168.1.24'}, user={'name':username})
-beacon = 2
+# 2 == LR Middle; 6 == actual Beacon
+#beacon = 2
+beacon = 6
 sleepduration = 2.5
 zipcode = '02465'
 sunsetCity = 'Boston'
@@ -21,11 +23,14 @@ owmCityId = 4945283
 # returning your own OpenWeatherMap key
 OWM_KEY = owmkey.get_owm_key()
 
-runTimes = [['sunset','23:00'], ['6:00','sunrise']]
+runTimes = [['sunset', '23:00'], ['6:00', 'sunrise']]
 #debug:
-#runTimes = [['sunset','23:00'], ['6:00','23:00']]
+#runTimes = [['sunset', '23:00'], ['6:00', '23:00']]
 
-colors_xy = [[0.2182,0.1485], [0.7,0.2986]] # blue, red
+# blue, red -- better for 1st-get Hue bulbs
+#colors_xy = [[0.2182,0.1485], [0.7,0.2986]]
+# blue, red -- better for 3rd-gen Hue bulbs
+colors_xy = [[0.1947, 0.2229], [0.6663, 0.2978]]
 
 local_tz = pytz.timezone(timezone)
 
@@ -33,28 +38,33 @@ def utc_to_local(utc_dt):
     local_dt = utc_dt.replace(tzinfo=pytz.utc).astimezone(local_tz)
     return local_tz.normalize(local_dt) # .normalize might be unnecessary
 
-# indicators: 0: blue (clear); 1: flashing blue (clouds); 2: red (rain); 3: flashing red (snow/severe)
+# indicators: 0: blue (clear); 1: flashing blue (clouds);
+# 2: red (rain); 3: flashing red (snow/severe)
 def owm_indicator(owm_code):
+    # See https://openweathermap.org/weather-conditions
     # Snow
     if (owm_code >= 600 and owm_code < 622):
         return 3
     # Freezing rain
-    if (owm_code == 511):
+    if owm_code == 511:
         return 3
     # Severe
-    if (owm_code == 504 or
-        owm_code == 503 or
-        owm_code == 961 or
-        owm_code == 962 or
-        owm_code == 781 or
-        (owm_code >= 900 and
-         owm_code <= 906)):
+    if owm_code == 504 or \
+       owm_code == 503 or \
+       owm_code == 961 or \
+       owm_code == 962 or \
+       owm_code == 781 or \
+       (owm_code >= 900 and \
+        owm_code <= 906):
         return 3
     # Rain
-    if ((owm_code >= 200 and
-         owm_code <= 232) or
-        (owm_code >= 500 and
-         owm_code <= 531)):
+    if (owm_code >= 200 and \
+        owm_code <= 232 and \
+        owm_code != 200 and \
+        owm_code != 230) or \
+        (owm_code >= 500 and \
+         owm_code <= 531 and \
+         owm_code != 520):
         return 2
     # Cloudy
     # 801 (few clouds)
@@ -68,15 +78,16 @@ def getSystemData():
     resource = {'which':'system'}
     return bridge.config.get(resource)['resource']
 
-# StoppableThread is from user Dolphin, from http://stackoverflow.com/questions/5849484/how-to-exit-a-multithreaded-program
-class StoppableThread(Thread):  
+# StoppableThread is from user Dolphin,
+# from http://stackoverflow.com/questions/5849484/how-to-exit-a-multithreaded-program
+class StoppableThread(Thread):
 
     def __init__(self):
         Thread.__init__(self)
-        self.stop_event = Event()        
+        self.stop_event = Event()
 
     def stop(self):
-        if self.isAlive() == True:
+        if self.isAlive():
             # set event to signal thread to terminate
             self.stop_event.set()
             # block calling thread until thread really has terminated
@@ -105,56 +116,65 @@ class ColorSequencer(IntervalTimer):
         #print "self._counter is %d" % self._counter
         colorIndex = self._sequence[self._counter]
         #print "Color index is %d" % colorIndex
-        if (colorIndex >= 0) :
+        if colorIndex >= 0:
             OnColor(colorIndex)
         else:
             Off()
         self._counter += 1
-        if (self._counter >= len(self._sequence)):
+        if self._counter >= len(self._sequence):
             self._counter = 0
 
 def OnColor(colorIndex):
-    resource = { 'which':beacon, 'data': { 'state': {'on':True, 'xy':colors_xy[colorIndex], 'sat':255, 'bri':255}}}
+    resource = {'which':beacon, 'data':
+                {'state': {'on':True, 'xy':colors_xy[colorIndex], 'sat':255,
+                           'bri':255}}}
     bridge.light.update(resource)
 
 def Off():
-    resource = { 'which':beacon, 'data': { 'state': {'on':False}}}
+    resource = {'which':beacon, 'data': {'state': {'on':False}}}
     bridge.light.update(resource)
 
 def getWorstWeather():
     usingToday = False
-    if (datetime.datetime.now().hour < 12):
+    if datetime.datetime.now().hour < 12:
         usingToday = True
 
-    if (usingToday):
+    if usingToday:
         comparedate = datetime.datetime.now().date()
     else:
         comparedate = datetime.date.today() + datetime.timedelta(days=1)
 
-    startdatetime = datetime.datetime.combine(comparedate, datetime.time(6,00,00,0,local_tz))
-    stopdatetime = datetime.datetime.combine(comparedate, datetime.time(18,00,00,0,local_tz))
-    
+    startdatetime = datetime.datetime.combine(
+        comparedate, datetime.time(6, 00, 00, 0, local_tz))
+    stopdatetime = datetime.datetime.combine(
+        comparedate, datetime.time(18, 00, 00, 0, local_tz))
+
     owm = pyowm.OWM(OWM_KEY)
     forecaster = owm.three_hours_forecast_at_id(owmCityId)
     forecast = forecaster.get_forecast()
-    
+
     worst_indicator = 0
     found = False
     worst_weather = 0
+    worst_code = 800
+    worst_datetime = startdatetime
     for weather in forecast:
-        weatherdatetime = utc_to_local(datetime.datetime.fromtimestamp(weather.get_reference_time('unix')))
-        if (weatherdatetime >= startdatetime and weatherdatetime <= stopdatetime):
+        weatherdatetime = utc_to_local(
+            datetime.datetime.fromtimestamp(weather.get_reference_time('unix')))
+        if weatherdatetime >= startdatetime and \
+           weatherdatetime <= stopdatetime:
             weather_code = weather.get_weather_code()
             beacon_indicator = owm_indicator(weather_code)
-            if (beacon_indicator > worst_indicator or
-                found == False):
+            if beacon_indicator > worst_indicator or \
+               found == False:
                 worst_indicator = beacon_indicator
                 worst_weather = weather
+                worst_datetime = weatherdatetime
+                worst_code = weather_code
                 found = True
-            #print (weather.get_reference_time('iso'),weather.get_detailed_status(),weather_code,beacon_indicator)
 
-    print ("Worst indicator is " + str(worst_indicator) + " " + worst_weather.get_detailed_status())
-    return worst_indicator
+    return [worst_indicator, worst_code, worst_weather.get_detailed_status(),
+            str(worst_datetime)]
 
 def main():
     response = getSystemData()
@@ -166,23 +186,23 @@ def main():
         print error
 
     # FIXME, ask for button if can't connect
-        
+
     redSequence = [1, -1]
     blueSequence = [0, -1]
     redSequencer = ColorSequencer(sleepduration, redSequence)
     blueSequencer = ColorSequencer(sleepduration, blueSequence)
 
-    ast = Astral()
+    ast = astral.Astral()
     location = ast[sunsetCity]
 
     running = False
     shouldRun = False
     runningSequencer = None
     weatherTime = None
-    worstWeather = None
+    worstWeather = {None, None, None}
 
     try:
-        while (True):            
+        while True:
             sunrise = location.sunrise()
             sunset = location.sunset()
             now = datetime.datetime.now(sunset.tzinfo)
@@ -195,96 +215,85 @@ def main():
                 elif onoff[0] == 'sunrise':
                     onstamp = sunrise
                 else:
-                    ontime = datetime.datetime.strptime(onoff[0], '%H:%M').time()
-                    onstamp = datetime.datetime(today.year, today.month, today.day,
-                                                ontime.hour, ontime.minute, tzinfo=tz)
+                    ontime = datetime.datetime.strptime(
+                        onoff[0], '%H:%M').time()
+                    onstamp = datetime.datetime(
+                        today.year, today.month, today.day,
+                        ontime.hour, ontime.minute, tzinfo=tz)
                 if onoff[1] == 'sunset':
                     offstamp = sunset
                 elif onoff[1] == 'sunrise':
                     offstamp = sunrise
                 else:
-                    offtime = datetime.datetime.strptime(onoff[1], '%H:%M').time()
+                    offtime = datetime.datetime.strptime(
+                        onoff[1], '%H:%M').time()
                     offstamp = datetime.datetime(
                         today.year, today.month, today.day,
                         offtime.hour, offtime.minute, tzinfo=tz)
-                print('Should run between ' + str(onstamp) + ' and ' +
-                      str(offstamp) + '; now ' + str(now))
-                if (now >= onstamp and now <= offstamp):
+                if now >= onstamp and now <= offstamp:
                     shouldRun = True
-            
-            if (running and shouldRun):
-                print 'Running'
+
+            if running and shouldRun:
                 # Re-check weather once an hour
-                if ((now - weatherTime).total_seconds() > 60*60):
+                if (now - weatherTime).total_seconds() > 60*60:
                     currentWeather = worstWeather
                     try:
                         worstWeather = getWorstWeather()
                     except:
-                        print('Failed to update weather')
+                        print 'Failed to update weather'
                         worstWeather = currentWeather
                     weatherTime = now
-                    if (worstWeather != currentWeather):
-                        print 'Weather changed'
-                        if (runningSequencer):
+                    if worstWeather != currentWeather:
+                        print ('Weather changed; worst weather is %s'
+                               % str(worstWeather))
+                        if runningSequencer:
                             runningSequencer.stop()
                             Off()
-                        if (worstWeather == 0):
+                        if worstWeather[0] == 0:
                             OnColor(0)
-                            print 'On, steady blue'
-                        elif (worstWeather == 1):
+                        elif worstWeather[0] == 1:
                             runningSequencer = blueSequencer
                             runningSequencer.start()
-                            blueSequencer = ColorSequencer(sleepduration, blueSequence)
-                            print 'On, flashing blue'
-                        elif (worstWeather == 2):
+                            blueSequencer = ColorSequencer(
+                                sleepduration, blueSequence)
+                        elif worstWeather[0] == 2:
                             OnColor(1)
-                            print 'On, steady red'
-                        elif (worstWeather == 3):
+                        elif worstWeather[0] == 3:
                             runningSequencer = redSequencer
                             runningSequencer.start()
-                            redSequencer = ColorSequencer(sleepduration, redSequence)
-                            print 'On, flashing red'
-                        
+                            redSequencer = ColorSequencer(
+                                sleepduration, redSequence)
 
-            if (not running and not shouldRun):
-                print 'Not running'
-
-            if (shouldRun and not running):
+            if shouldRun and not running:
                 # Get weather and start running
-                print 'Not running but should be - start'
                 try:
                     worstWeather = getWorstWeather()
                 except:
-                    worstWeather = 0
-                    print("Failed to get weather; assume clear")
-                
+                    worstWeather = [0, 800, now]
+                    print "Failed to get weather; assume clear"
+
+                print 'Weather at start; worst weather is %s' % str(worstWeather)
                 weatherTime = now
 
-                if (worstWeather == 0):
+                if worstWeather[0] == 0:
                     OnColor(0)
-                    print 'On, steady blue'
-                elif (worstWeather == 1):
+                elif worstWeather[0] == 1:
                     runningSequencer = blueSequencer
                     runningSequencer.start()
                     blueSequencer = ColorSequencer(sleepduration, blueSequence)
-                    print 'On, flashing blue'
-                elif (worstWeather == 2):
+                elif worstWeather[0] == 2:
                     OnColor(1)
-                    print 'On, steady red'
-                elif (worstWeather == 3):
+                elif worstWeather[0] == 3:
                     runningSequencer = redSequencer
                     runningSequencer.start()
                     redSequencer = ColorSequencer(sleepduration, redSequence)
-                    print 'On, flashing red'
                 running = True
 
-            if (running and not shouldRun):
+            if running and not shouldRun:
                 # Stop running
-                print 'Running but should not be - stop'
-                if (runningSequencer):
+                if runningSequencer:
                     runningSequencer.stop()
                 Off()
-                print 'Off'
                 running = False
 
             sys.stdout.flush()
@@ -292,8 +301,8 @@ def main():
 
     except KeyboardInterrupt:
         print 'Bye!'
-        if (runningSequencer):
+        if runningSequencer:
             runningSequencer.stop()
         Off()
-        
+
 main()
