@@ -26,6 +26,7 @@ owmCityId = 4945283
 # HA
 haWeatherUrl = 'http://piscine.parkercat.org:8123/api/states/weather.openweathermap'
 haAccess = owmkey.get_ha_access()
+haToken = owmkey.get_ha_token()
 USE_HA = True
 
 # Note: provide 'owmkey.py' file that contains a function get_owm_key
@@ -186,7 +187,7 @@ def getWorstWeatherHA():
         comparedate, datetime.time(18, 00, 00, 0))
 
     #print 'Look for forecast beween %s and %s' % (str(startdatetime), str(stopdatetime))
-    headers = {'x-ha-access': haAccess, 'content-type': 'application/json'}
+    headers = {'Authorization': 'Bearer %s' % haToken, 'content-type': 'application/json'}
     response = get(haWeatherUrl, headers=headers)
     try:
         weather = json.loads(response.text)
