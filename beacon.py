@@ -15,8 +15,8 @@ import owmkey
 USERNAME = '1cd503803c2588ef8ea97d02a2520df'
 BRIDGE = Bridge('192.168.1.24', USERNAME)
 # 2 == LR Middle; 6 == actual Beacon
-BEACON = 2
-#BEACON = 6
+#BEACON = 2
+BEACON = 6
 SLEEP_DURATION = 2.5
 SUNSET_CITY = 'Boston'
 TIMEZONE = 'America/New_York'
@@ -31,9 +31,9 @@ USE_HA = True
 # returning your own OpenWeatherMap key
 OWM_KEY = owmkey.get_owm_key()
 
-#RUN_TIMES = [['sunset', '23:00'], ['6:00', 'sunrise']]
-#debug:
-RUN_TIMES = [['sunset', '23:00'], ['6:00', '23:00']]
+RUN_TIMES = [['sunset', '23:00'], ['6:00', 'sunrise']]
+#debug/test:
+#RUN_TIMES = [['sunset', '23:00'], ['6:00', '23:00']]
 
 # blue, red -- better for 1st-get Hue bulbs
 #COLORS_XY = [[0.2182,0.1485], [0.7,0.2986]]

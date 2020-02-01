@@ -6,6 +6,6 @@ Flashing blue, clouds due
 Steady red, rain ahead   
 Flashing red, snow instead   
 
-Uses BeautifulHue for Philips Hue API, pyowm for Open Weathermap API, and astral for sunset time.
+Uses QHue for Philips Hue API, pyowm for Open Weathermap API, and astral for sunset time.
 
 'trials' directory contains test scripts
