@@ -31,7 +31,7 @@ USE_HA = True
 # returning your own OpenWeatherMap key
 OWM_KEY = owmkey.get_owm_key()
 
-RUN_TIMES = [['sunset', '23:00'], ['6:00', 'sunrise']]
+RUN_TIMES = [['sunset', '23:15'], ['5:45', 'sunrise']]
 #debug/test:
 #RUN_TIMES = [['sunset', '23:00'], ['6:00', '23:00']]
 
