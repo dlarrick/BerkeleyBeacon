@@ -1,2 +1,2 @@
 #!/bin/sh
-nohup python beacon.py > beacon.log &
+nohup python3 beacon.py > beacon.log &
