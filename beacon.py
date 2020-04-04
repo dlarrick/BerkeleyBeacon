@@ -11,6 +11,8 @@ from requests import get
 # OWM
 import pyowm
 import owmkey
+import dateutil
+from dateutil import parser
 
 USERNAME = '1cd503803c2588ef8ea97d02a2520df'
 BRIDGE = Bridge('192.168.1.24', USERNAME)
@@ -23,7 +25,7 @@ TIMEZONE = 'America/New_York'
 OWM_CITY_ID = 4945283
 
 # HA
-HA_WEATHER_URL = 'http://rosie.parkercat.org:8123/api/states/weather.dark_sky_hourly'
+HA_WEATHER_URL = 'http://rosie.parkercat.org:8123/api/states/weather.nws_hourly'
 HA_TOKEN = owmkey.get_ha_token()
 USE_HA = True
 
@@ -165,9 +167,9 @@ def get_worst_weather_HA():
         comparedate = datetime.date.today() + datetime.timedelta(days=1)
 
     startdatetime = datetime.datetime.combine(
-        comparedate, datetime.time(6, 00, 00, 0))
+        comparedate, datetime.time(6, 00, 00, 0, LOCAL_TZ))
     stopdatetime = datetime.datetime.combine(
-        comparedate, datetime.time(18, 00, 00, 0))
+        comparedate, datetime.time(18, 00, 00, 0, LOCAL_TZ))
 
     #print('Look for forecast beween %s and %s' %
     #      (str(startdatetime), str(stopdatetime)))
@@ -185,8 +187,8 @@ def get_worst_weather_HA():
     worst_condition = ''
     worst_datetime = startdatetime
     for period in forecast:
-        periodtimestamp = datetime.datetime.strptime(
-            period['datetime'], "%Y-%m-%dT%H:%M:%S+00:00")
+        periodtimestamp = dateutil.parser.isoparse(
+            period['datetime'])
         if startdatetime <= periodtimestamp <= stopdatetime:
             period_condition = period['condition']
             period_indicator = ha_indicator(period_condition)
