@@ -84,7 +84,7 @@ def ha_indicator(ha_condition):
                      'hail': 3,
                      'lightning': 1,
                      'lightning-rainy': 2,
-                     'partlycloudy' : 1,
+                     'partlycloudy' : 0,
                      'pouring': 2,
                      'rainy': 2,
                      'snowy': 3,
@@ -108,7 +108,7 @@ class StoppableThread(Thread):
         self.stop_event = Event()
 
     def stop(self):
-        if self.isAlive():
+        if self.is_alive():
             # set event to signal thread to terminate
             self.stop_event.set()
             # block calling thread until thread really has terminated
@@ -179,8 +179,8 @@ def get_worst_weather_HA():
     try:
         weather = json.loads(response.text)
         forecast = weather['attributes']['forecast']
-    except:
-        print("Could not get forecast from HA")
+    except Exception as e:
+        print(f"Could not get forecast from HA: {e}")
         return [0, -1, 'error', str(startdatetime)]
     found = False
     worst_indicator = 0
