@@ -181,7 +181,10 @@ def get_worst_weather_HA():
         forecast = weather['attributes']['forecast']
     except Exception as e:
         print(f"Could not get forecast from HA: {e}")
-        return [0, -1, 'error', str(startdatetime)]
+        return None
+    if not forecast:
+        print("Forecast is empty")
+        return None
     found = False
     worst_indicator = 0
     worst_condition = ''
@@ -302,6 +305,8 @@ def main():
                     current_weather = worst_weather
                     try:
                         worst_weather = get_worst_weather()
+                        if not worst_weather:
+                            worst_weather = current_weather
                     except:
                         print('Failed to update weather')
                         worst_weather = current_weather
@@ -329,8 +334,11 @@ def main():
 
             if should_run and not running:
                 # Get weather and start running
+                
                 try:
                     worst_weather = get_worst_weather()
+                    if not worst_weather:
+                        worst_weather = [0, 800, now]
                 except:
                     worst_weather = [0, 800, now]
                     print("Failed to get weather; assume clear")
