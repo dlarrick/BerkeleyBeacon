@@ -16,9 +16,10 @@ from dateutil import parser
 
 USERNAME = '1cd503803c2588ef8ea97d02a2520df'
 BRIDGE = Bridge('192.168.1.24', USERNAME)
-# 2 == LR Middle; 6 == actual Beacon
+# 2 == LR Middle; 6 == old Beacon, 10 == new brigher beacon
 #BEACON = 2
-BEACON = 6
+#BEACON = 6
+BEACON = 10
 SLEEP_DURATION = 2.5
 SUNSET_CITY = 'Boston'
 TIMEZONE = 'America/New_York'
