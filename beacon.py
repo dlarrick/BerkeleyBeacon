@@ -7,7 +7,7 @@ import pytz
 import astral
 from qhue import Bridge
 # HA
-from requests import get
+from requests import get, post
 # OWM
 import pyowm
 import owmkey
@@ -26,7 +26,8 @@ TIMEZONE = 'America/New_York'
 OWM_CITY_ID = 4945283
 
 # HA
-HA_WEATHER_URL = 'http://rosie.parkercat.org:8123/api/states/weather.nws_hourly'
+HA_WEATHER_URL = 'http://rosie.parkercat.org:8123/api/states/sensor.nws_hourly_forecast'
+HA_WEATHER_URL_FALLBACK = 'http://rosie.parkercat.org:8123/api/states/weather.first_floor_heat'
 HA_TOKEN = owmkey.get_ha_token()
 USE_HA = True
 
@@ -181,8 +182,15 @@ def get_worst_weather_HA():
         weather = json.loads(response.text)
         forecast = weather['attributes']['forecast']
     except Exception as e:
-        print(f"Could not get forecast from HA: {e}")
-        return None
+        # Try fallback
+        response = get(HA_WEATHER_URL_FALLBACK, headers=headers)
+        try:
+            weather = json.loads(response.text)
+            forecast = weather['attributes']['forecast']
+            print("Using fallback weather provider")
+        except Exception as fe:
+            print(f"Could not get forecast from HA: {e}, {fe}")
+            return None
     if not forecast:
         print("Forecast is empty")
         return None
