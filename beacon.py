@@ -1,32 +1,33 @@
 import sys
 import time
 import datetime
-from threading import Thread, Event
 import json
 import pytz
+import holidays
+import random
 import astral
-from qhue import Bridge
+import astral.geocoder as geocoder
+import astral.sun as ast_sun
 # HA
 from requests import get
 # OWM
-import pyowm
+#import pyowm
 import owmkey
 import dateutil
 from dateutil import parser
 
-USERNAME = '1cd503803c2588ef8ea97d02a2520df'
-BRIDGE = Bridge('192.168.1.24', USERNAME)
-# 2 == LR Middle; 6 == old Beacon, 10 == new brigher beacon
-#BEACON = 2
-#BEACON = 6
-BEACON = 10
-SLEEP_DURATION = 2.5
+from bridge import BRIDGE
+from conf import BEACON, RUN_TIMES, SLEEP_DURATION, SEQUENCES, HOLIDAYS, Color
+from sequencer import ColorSequencer
+
 SUNSET_CITY = 'Boston'
 TIMEZONE = 'America/New_York'
 OWM_CITY_ID = 4945283
 
 # HA
-HA_WEATHER_URL = 'http://rosie.parkercat.org:8123/api/states/weather.nws_hourly'
+HA_WEATHER_URL = 'http://rosie.parkercat.org:8123/api/states/sensor.nws_hourly_forecast'
+HA_WEATHER_URL_FALLBACK = 'http://rosie.parkercat.org:8123/api/states/weather.first_floor_heat'
+
 HA_TOKEN = owmkey.get_ha_token()
 USE_HA = True
 
@@ -34,16 +35,14 @@ USE_HA = True
 # returning your own OpenWeatherMap key
 OWM_KEY = owmkey.get_owm_key()
 
-RUN_TIMES = [['sunset', '23:15'], ['5:45', 'sunrise']]
-#debug/test:
-#RUN_TIMES = [['sunset', '23:00'], ['6:00', '23:00']]
-
 # blue, red -- better for 1st-get Hue bulbs
 #COLORS_XY = [[0.2182,0.1485], [0.7,0.2986]]
 # blue, red -- better for 3rd-gen Hue bulbs
 COLORS_XY = [[0.1947, 0.2229], [0.6663, 0.2978]]
 
 LOCAL_TZ = pytz.timezone(TIMEZONE)
+
+running_sequencer = None
 
 def utc_to_local(utc_dt):
     local_dt = utc_dt.replace(tzinfo=pytz.utc).astimezone(LOCAL_TZ)
@@ -82,76 +81,48 @@ def ha_indicator(ha_condition):
     condition_map = {'clear-night' : 0,
                      'cloudy': 1,
                      'fog': 1,
-                     'hail': 3,
+                     'hail': 4,
                      'lightning': 1,
                      'lightning-rainy': 2,
                      'partlycloudy' : 0,
                      'pouring': 2,
                      'rainy': 2,
                      'snowy': 3,
-                     'snowy-rainy': 3,
+                     'snowy-rainy': 4,
                      'sunny': 0,
                      'windy': 0,
                      'windy-variant': 0,
-                     'exceptional': 3, }
+                     'exceptional': 4, }
     try:
         return condition_map[ha_condition]
     except KeyError:
         print('Condition %s not found' % ha_condition)
     return 0
 
-# StoppableThread is from user Dolphin,
-# from http://stackoverflow.com/questions/5849484/how-to-exit-a-multithreaded-program
-class StoppableThread(Thread):
-
-    def __init__(self):
-        Thread.__init__(self)
-        self.stop_event = Event()
-
-    def stop(self):
-        if self.is_alive():
-            # set event to signal thread to terminate
-            self.stop_event.set()
-            # block calling thread until thread really has terminated
-            self.join()
-
-class IntervalTimer(StoppableThread):
-
-    def __init__(self, interval, worker_func):
-        StoppableThread.__init__(self)
-        self._interval = interval
-        self._worker_func = worker_func
-
-    def run(self):
-        while not self.stop_event.is_set():
-            self._worker_func(self)
-            time.sleep(self._interval)
-
-class ColorSequencer(IntervalTimer):
-
-    def __init__(self, interval, sequence):
-        IntervalTimer.__init__(self, interval, ColorSequencer.sequencer)
-        self._sequence = sequence
-        self._counter = 0
-
-    def sequencer(self):
-        #print("self._counter is %d" % self._counter)
-        color_index = self._sequence[self._counter]
-        #print("Color index is %d" % color_index)
-        if color_index >= 0:
-            turn_on_with_color(color_index)
-        else:
-            turn_off()
-        self._counter += 1
-        if self._counter >= len(self._sequence):
-            self._counter = 0
-
-def turn_on_with_color(color_index):
-    BRIDGE.lights(BEACON, 'state', bri=255, sat=255, on=True,
-                  xy=COLORS_XY[color_index])
-
-def turn_off():
-    BRIDGE.lights(BEACON, 'state', on=False)
+def get_color_sequence(weather_category: int):
+    """
+    Get colors based on holiday or current weather
+    """
+    today = datetime.datetime.today()
+    us_holidays = holidays.US(
+        years=today.year, subdiv='MA',
+        categories=['public', 'unofficial'], observed=True)
+    if today in us_holidays:
+        holiday = us_holidays[today]
+        holiday_sequence = HOLIDAYS.get(holiday)
+        if holiday_sequence and holiday_sequence in SEQUENCES:
+            return SEQUENCES[holiday_sequence]
+    weather_colors = [
+        "clear", "clouds", "rain", "snow", "severe"]
+    try:
+        weather_color = weather_colors[weather_category]
+    except Exception as e:
+        print(f"Failed to get color: {e}")
+        weather_color = "error"
+    if weather_color not in SEQUENCES:
+        print(f"Weather color {weather_color} not found")
+        weather_color = "error"
+    return SEQUENCES[weather_color]
 
 def get_worst_weather():
     if USE_HA:
@@ -181,11 +152,15 @@ def get_worst_weather_HA():
         weather = json.loads(response.text)
         forecast = weather['attributes']['forecast']
     except Exception as e:
-        print(f"Could not get forecast from HA: {e}")
-        return None
-    if not forecast:
-        print("Forecast is empty")
-        return None
+        # Try fallback
+        response = get(HA_WEATHER_URL_FALLBACK, headers=headers)
+        try:
+            weather = json.loads(response.text)
+            forecast = weather['attributes']['forecast']
+            print("Using fallback weather provider")
+        except Exception as fe:
+            print(f"Could not get forecast from HA: {e}, {fe}")
+            return [4, -1, 'error', str(startdatetime)]
     found = False
     worst_indicator = 0
     worst_condition = ''
@@ -254,24 +229,21 @@ def main():
         print('No lights in Hub')
         return 1
 
-    red_sequence = [1, -1]
-    blue_sequencer = [0, -1]
-    red_sequencer = ColorSequencer(SLEEP_DURATION, red_sequence)
-    blue_sequencerr = ColorSequencer(SLEEP_DURATION, blue_sequencer)
+    sequencer = ColorSequencer(SLEEP_DURATION)
 
-    ast = astral.Astral()
-    location = ast[SUNSET_CITY]
+    location = geocoder.lookup(SUNSET_CITY, geocoder.database())
+    sun = ast_sun.sun(location.observer, datetime.datetime.today())
 
     running = False
     should_run = False
-    running_sequencer = None
     weather_time = None
     worst_weather = {None, None, None}
+    current_sequence = None
 
     try:
         while True:
-            sunrise = location.sunrise()
-            sunset = location.sunset()
+            sunrise = sun['sunrise']
+            sunset = sun['sunset']
             now = datetime.datetime.now(sunset.tzinfo)
             today = datetime.date.today()
             now_tz = now.tzinfo
@@ -302,8 +274,8 @@ def main():
 
             if running and should_run:
                 # Re-check weather once an hour
+                current_weather = worst_weather
                 if (now - weather_time).total_seconds() > 60*60:
-                    current_weather = worst_weather
                     try:
                         worst_weather = get_worst_weather()
                         if not worst_weather:
@@ -312,26 +284,18 @@ def main():
                         print('Failed to update weather')
                         worst_weather = current_weather
                     weather_time = now
-                    if worst_weather != current_weather:
-                        print('Weather changed; worst weather is %s'
-                              % str(worst_weather))
-                        if running_sequencer:
-                            running_sequencer.stop()
-                            turn_off()
-                        if worst_weather[0] == 0:
-                            turn_on_with_color(0)
-                        elif worst_weather[0] == 1:
-                            running_sequencer = blue_sequencerr
-                            running_sequencer.start()
-                            blue_sequencerr = ColorSequencer(
-                                SLEEP_DURATION, blue_sequencer)
-                        elif worst_weather[0] == 2:
-                            turn_on_with_color(1)
-                        elif worst_weather[0] == 3:
-                            running_sequencer = red_sequencer
-                            running_sequencer.start()
-                            red_sequencer = ColorSequencer(
-                                SLEEP_DURATION, red_sequence)
+                sequence = get_color_sequence(worst_weather[0])
+                if worst_weather != current_weather:
+                    print('Weather changed; worst weather is %s'
+                          % str(worst_weather))
+                if sequence != current_sequence:
+                    print("Change sequence "
+                          f"{current_sequence} -> {sequence}")
+                    sequencer.stop()
+                    sequencer = ColorSequencer(SLEEP_DURATION)
+                    sequencer.set_sequence(sequence)
+                    sequencer.start()
+                    current_sequence = sequence
 
             if should_run and not running:
                 # Get weather and start running
@@ -340,32 +304,22 @@ def main():
                     worst_weather = get_worst_weather()
                     if not worst_weather:
                         worst_weather = [0, 800, now]
-                except:
+                except Exception as e:
                     worst_weather = [0, 800, now]
-                    print("Failed to get weather; assume clear")
+                    print(f"Failed to get weather({e}); assume clear")
 
                 print('Weather at start; worst weather is %s' % str(worst_weather))
                 weather_time = now
-
-                if worst_weather[0] == 0:
-                    turn_on_with_color(0)
-                elif worst_weather[0] == 1:
-                    running_sequencer = blue_sequencerr
-                    running_sequencer.start()
-                    blue_sequencerr = ColorSequencer(SLEEP_DURATION, blue_sequencer)
-                elif worst_weather[0] == 2:
-                    turn_on_with_color(1)
-                elif worst_weather[0] == 3:
-                    running_sequencer = red_sequencer
-                    running_sequencer.start()
-                    red_sequencer = ColorSequencer(SLEEP_DURATION, red_sequence)
+                sequence = get_color_sequence(worst_weather[0])
+                sequencer.set_sequence(sequence)
+                sequencer.start()
+                current_sequence = sequence
                 running = True
 
             if running and not should_run:
                 # Stop running
-                if running_sequencer:
-                    running_sequencer.stop()
-                turn_off()
+                if sequencer:
+                    sequencer.stop(do_turn_off=True)
                 running = False
 
             sys.stdout.flush()
@@ -373,8 +327,8 @@ def main():
 
     except KeyboardInterrupt:
         print('Bye!')
-        if running_sequencer:
-            running_sequencer.stop()
-        turn_off()
+        if sequencer:
+            sequencer.stop(do_turn_off=True)
 
-main()
+if __name__ == "__main__":
+    sys.exit(main())
