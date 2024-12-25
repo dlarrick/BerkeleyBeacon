@@ -1,5 +1,6 @@
 __pycache__
 owmkey.py
+beacon.log
 *.pyc
 *~
 venv/
