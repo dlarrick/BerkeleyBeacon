@@ -1,6 +1,7 @@
 import sys
 import time
 import datetime
+import zoneinfo
 import json
 import pytz
 import holidays
@@ -244,9 +245,10 @@ def main():
     sequencer = ColorSequencer(SLEEP_DURATION, beacon=BEACON)
 
     location = geocoder.lookup(SUNSET_CITY, geocoder.database())
+    timezone = zoneinfo.ZoneInfo(location.timezone)
     today = datetime.datetime.today()
     sun = ast_sun.sun(
-        location.observer, today, tzinfo=location.timezone)
+        location.observer, today, tzinfo=timezone)
 
     us_holidays = setup_holidays()
 
