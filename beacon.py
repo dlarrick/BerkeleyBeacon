@@ -17,7 +17,7 @@ import dateutil
 from dateutil import parser
 
 from bridge import BRIDGE
-from conf import BEACON, RUN_TIMES, SLEEP_DURATION, SEQUENCES, HOLIDAYS, Color
+from conf import BEACON, RUN_TIMES, SLEEP_DURATION, SEQUENCES, HOLIDAYS, MORE_HOLIDAYS, Color
 from sequencer import ColorSequencer
 
 DEBUG = False
@@ -100,16 +100,13 @@ def ha_indicator(ha_condition):
         print('Condition %s not found' % ha_condition)
     return 0
 
-def get_color_sequence(weather_category: int):
+def get_color_sequence(weather_category: int, holidays=None):
     """
     Get colors based on holiday or current weather
     """
     today = datetime.datetime.today()
-    us_holidays = holidays.US(
-        years=today.year, subdiv='MA',
-        categories=['public', 'unofficial'], observed=True)
-    if today in us_holidays:
-        holiday = us_holidays[today]
+    if holidays and today in holidays:
+        holiday = holidays[today]
         holiday_sequence = HOLIDAYS.get(holiday)
         if holiday_sequence and holiday_sequence in SEQUENCES:
             return SEQUENCES[holiday_sequence]
@@ -221,6 +218,20 @@ def get_worst_weather_OWM():
     return [worst_indicator, worst_code, worst_weather.get_detailed_status(),
             str(worst_datetime)]
 
+def setup_holidays():
+    today = datetime.datetime.today()
+    us_holidays = holidays.US(
+        years=today.year, subdiv='MA',
+        categories=['public', 'unofficial'], observed=True)
+    for day, name in MORE_HOLIDAYS:
+        try:
+            func = getattr(us_holidays, f"_add_holiday_{day}")
+        except AttributeError:
+            func = getattr(us_holidays, f"_add_{day}")
+        func(name)
+    return us_holidays
+
+
 def main():
     response = BRIDGE.lights()
 
@@ -230,13 +241,14 @@ def main():
         print('No lights in Hub')
         return 1
 
-    sequencer = ColorSequencer(SLEEP_DURATION)
+    sequencer = ColorSequencer(SLEEP_DURATION, beacon=BEACON)
 
     location = geocoder.lookup(SUNSET_CITY, geocoder.database())
-    print(f"{location=} {location.observer=}")
-    sun = ast_sun.sun(location.observer,
-                      datetime.datetime.today(),
-                      tzinfo=location.timezone)
+    today = datetime.datetime.today()
+    sun = ast_sun.sun(
+        location.observer, today, tzinfo=location.timezone)
+
+    us_holidays = setup_holidays()
 
     running = False
     should_run = False
@@ -254,6 +266,11 @@ def main():
             should_run = False
             if DEBUG:
                 print(f"{now=} {sunrise=} {sunset=} {RUN_TIMES=}")
+
+            if us_holidays._year != today.year:
+                # Handle year change while still running
+                us_holidays = setup_holidays()
+
             for onoff in RUN_TIMES:
                 if onoff[0] == 'sunset':
                     onstamp = sunset
@@ -294,13 +311,15 @@ def main():
                         print('Failed to update weather')
                         worst_weather = current_weather
                     weather_time = now
-                sequence = get_color_sequence(worst_weather[0])
+                sequence = get_color_sequence(
+                    worst_weather[0], holidays=us_holidays)
                 if worst_weather != current_weather:
                     print('Weather changed; worst weather is %s'
                           % str(worst_weather))
                 if sequence != current_sequence:
-                    print("Change sequence "
-                          f"{current_sequence} -> {sequence}")
+                    holiday = us_holidays.get(today)
+                    if HOLIDAYS.get(holiday):
+                        print(f'Override weather for {holiday=}')
                     sequencer.stop()
                     sequencer = ColorSequencer(SLEEP_DURATION)
                     sequencer.set_sequence(sequence)
@@ -319,8 +338,13 @@ def main():
                     print(f"Failed to get weather({e}); assume clear")
 
                 print('Weather at start; worst weather is %s' % str(worst_weather))
+                holiday = us_holidays.get(today)
+                if HOLIDAYS.get(holiday):
+                    print(f'Override weather for {holiday=}')
+
                 weather_time = now
-                sequence = get_color_sequence(worst_weather[0])
+                sequence = get_color_sequence(
+                    worst_weather[0], holidays=us_holidays)
                 if DEBUG:
                     print(f"{sequence=}")
                 sequencer.set_sequence(sequence)
