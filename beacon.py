@@ -323,7 +323,7 @@ def main():
                     if HOLIDAYS.get(holiday):
                         print(f'Override weather for {holiday=}')
                     sequencer.stop()
-                    sequencer = ColorSequencer(SLEEP_DURATION)
+                    sequencer = ColorSequencer(SLEEP_DURATION, beacon=BEACON)
                     sequencer.set_sequence(sequence)
                     sequencer.start()
                     current_sequence = sequence
