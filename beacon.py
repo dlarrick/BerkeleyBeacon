@@ -20,6 +20,7 @@ from bridge import BRIDGE
 from conf import BEACON, RUN_TIMES, SLEEP_DURATION, SEQUENCES, HOLIDAYS, Color
 from sequencer import ColorSequencer
 
+DEBUG = False
 SUNSET_CITY = 'Boston'
 TIMEZONE = 'America/New_York'
 OWM_CITY_ID = 4945283
@@ -232,7 +233,10 @@ def main():
     sequencer = ColorSequencer(SLEEP_DURATION)
 
     location = geocoder.lookup(SUNSET_CITY, geocoder.database())
-    sun = ast_sun.sun(location.observer, datetime.datetime.today())
+    print(f"{location=} {location.observer=}")
+    sun = ast_sun.sun(location.observer,
+                      datetime.datetime.today(),
+                      tzinfo=location.timezone)
 
     running = False
     should_run = False
@@ -248,6 +252,8 @@ def main():
             today = datetime.date.today()
             now_tz = now.tzinfo
             should_run = False
+            if DEBUG:
+                print(f"{now=} {sunrise=} {sunset=} {RUN_TIMES=}")
             for onoff in RUN_TIMES:
                 if onoff[0] == 'sunset':
                     onstamp = sunset
@@ -269,9 +275,13 @@ def main():
                     offstamp = datetime.datetime(
                         today.year, today.month, today.day,
                         offtime.hour, offtime.minute, tzinfo=now_tz)
+                if DEBUG:
+                    print(f"{onstamp=} {now=} {offstamp=}")
                 if onstamp <= now <= offstamp:
                     should_run = True
 
+            if DEBUG:
+                print(f"{should_run=}")
             if running and should_run:
                 # Re-check weather once an hour
                 current_weather = worst_weather
@@ -311,6 +321,8 @@ def main():
                 print('Weather at start; worst weather is %s' % str(worst_weather))
                 weather_time = now
                 sequence = get_color_sequence(worst_weather[0])
+                if DEBUG:
+                    print(f"{sequence=}")
                 sequencer.set_sequence(sequence)
                 sequencer.start()
                 current_sequence = sequence

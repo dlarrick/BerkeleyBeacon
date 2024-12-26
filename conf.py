@@ -2,7 +2,7 @@ import enum
 
 # 2 == LR Middle; 6 == actual Beacon
 # BEACON = 2
-BEACON = 6
+BEACON = 10
 
 RUN_TIMES = [['sunset', '23:15'], ['5:45', 'sunrise']]
 # debug/test:
