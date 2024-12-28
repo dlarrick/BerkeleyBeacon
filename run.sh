@@ -1,5 +1,5 @@
-#!/bin/sh
+#!/bin/bash
 #python3 -m venv venv
-source venv/bin/activate
+source /home/doug/Git/BerkeleyBeacon/venv/bin/activate
 #pip3 install -r requirements.txt
-nohup python3 beacon.py > beacon.log &
+nohup /home/doug/Git/BerkeleyBeacon/venv/bin/python beacon.py >> beacon.log &

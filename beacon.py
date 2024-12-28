@@ -349,6 +349,8 @@ def main():
                     worst_weather[0], holidays=us_holidays)
                 if DEBUG:
                     print(f"{sequence=}")
+                sequencer.stop()
+                sequencer = ColorSequencer(SLEEP_DURATION, beacon=BEACON)
                 sequencer.set_sequence(sequence)
                 sequencer.start()
                 current_sequence = sequence
