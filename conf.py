@@ -96,7 +96,7 @@ MORE_HOLIDAYS = [
     ("apr_21", "Lis's Birthday"),
     ("sep_18", "Doug's Birthday"),
     ("dec_26", "Test"),
-    ("dec_31": "New Year's Eve"),
+    ("dec_31", "New Year's Eve"),
 ]
 
 HOLIDAYS = {
