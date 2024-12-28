@@ -73,6 +73,7 @@ SEQUENCES = {
     "severe": [Color.ORANGE, Color.BLACK],
     "error": [Color.RED, Color.VIOLET],
 
+    "blue_white": [Color.BLUE, Color.WHITE],
     "christmas": [Color.RED, Color.GREEN],
     "easter": [Color.PALE_PINK, Color.PALE_BLUE],
     "flag": [Color.RED, Color.WHITE, Color.BLUE],
@@ -95,6 +96,7 @@ MORE_HOLIDAYS = [
     ("apr_21", "Lis's Birthday"),
     ("sep_18", "Doug's Birthday"),
     ("dec_26", "Test"),
+    ("dec_31": "New Year's Eve"),
 ]
 
 HOLIDAYS = {
@@ -103,7 +105,8 @@ HOLIDAYS = {
     "Easter": "easter",
     "Evacuation Day; Saint Patrick's Day": "kelly_green",
     "Lis's Birthday": "purples",
-    "New Year's Day": "rainbow",
+    "New Year's Day": "blue_white",
+    "New Year's Eve": "rainbow",
     "Patriots' Day": "flag",
     "Valentine's Day": "valentine",
     "Washington's Birthday": "flag",
